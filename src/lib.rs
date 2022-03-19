@@ -3,12 +3,13 @@ use std::io::{prelude::*, BufReader};
 use std::process;
 use clap::Parser;
 
-
-
 #[derive(Parser, Debug)]
 pub struct Cli {
-    #[clap(parse(from_os_str))]
-    pub filesource: std::path::PathBuf,
+    #[clap(parse(from_os_str), short)]
+    filesource: std::path::PathBuf,
+    
+    #[clap(short)]
+    export: Option<String>
 }
 
 pub fn run(cli: Cli) {
@@ -18,6 +19,15 @@ pub fn run(cli: Cli) {
 
     let json_pattern = json_pattern(&mut reader_jsonr);
     let sls_pattern = sls_pattern(&mut reader_sls);
+
+    if cli.export.is_some() {
+        let mut file = File::create("variables.txt").unwrap();
+        file.write(sls_pattern.as_bytes());
+        file.write("\n\n".as_bytes());
+        file.write(json_pattern.as_bytes());
+    }
+
+
     
     println!("{json_pattern}\n");
     println!("{sls_pattern}\n");
