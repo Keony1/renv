@@ -1,53 +1,48 @@
-use std::fs;
-use std::io::prelude::*;
-use std::{env, error::Error};
+use std::fs::File;
+use std::io::{prelude::*, BufReader};
+use std::process;
+use clap::Parser;
 
-pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
-    let contents = fs::read_to_string(config.sourcefile).expect("Arquivo não encontrado");
 
-    let json_pattern = json_patten(&contents);
-    let sls_pattern = sls_pattern(&contents);
 
+#[derive(Parser, Debug)]
+pub struct Cli {
+    #[clap(parse(from_os_str))]
+    pub filesource: std::path::PathBuf,
+}
+
+pub fn run(cli: Cli) {
+    let mut reader_jsonr = get_file_reader(&cli.filesource);
+    let mut reader_sls = get_file_reader(&cli.filesource);
+
+
+    let json_pattern = json_pattern(&mut reader_jsonr);
+    let sls_pattern = sls_pattern(&mut reader_sls);
+    
     println!("{json_pattern}\n");
     println!("{sls_pattern}\n");
-
-    if config.export == "true" {
-        let mut file = fs::File::create("variables.txt").unwrap();
-        file.write(sls_pattern.as_bytes());
-        file.write("\n\n".as_bytes());
-        file.write(json_pattern.as_bytes());
-    }
-
-    Ok(())
 }
 
-#[derive(Debug)]
-pub struct Config {
-    sourcefile: String,
-    export: String,
+fn get_file_reader(path: &std::path::PathBuf) -> impl BufRead {
+    let result = File::open(path);
+
+    let file = match result { 
+        Ok(file) => { file },
+        Err(error) => {
+            eprintln!("Problem parsing arguments: {}", error);
+            process::exit(1);
+        }
+    };
+
+    BufReader::new(file)
 }
 
-impl Config {
-    pub fn new(mut args: env::Args) -> Result<Config, &'static str> {
-        args.next();
+fn sls_pattern<R: BufRead>(reader: &mut R) -> String {
+    let lines = reader.lines();
 
-        let sourcefile = match args.next() {
-            Some(arg) => arg,
-            None => return Err("Didnt get a sourcefile"),
-        };
-
-        Ok(Config {
-            sourcefile,
-            export: args.next().unwrap_or_default(),
-        })
-    }
-}
-
-fn sls_pattern(contents: &String) -> String {
-    let lines = contents.lines();
     let mut sls_format = String::from("environment:\n");
-
     for line in lines {
+        let line = line.unwrap();
         if line == "" {
             continue;
         }
@@ -62,12 +57,12 @@ fn sls_pattern(contents: &String) -> String {
     sls_format
 }
 
-fn json_patten(contents: &String) -> String {
-    let lines = contents.lines();
+fn json_pattern<R: BufRead>(reader: &mut R) -> String {
+    let  lines = reader.lines();
 
     let mut json_format = String::from("{\n");
-
     for line in lines {
+        let line = line.unwrap();
         if line == "" {
             continue;
         }
