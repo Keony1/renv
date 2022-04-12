@@ -5,7 +5,7 @@ use std::{env, error::Error};
 pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
     let contents = fs::read_to_string(config.sourcefile).expect("Arquivo não encontrado");
 
-    let json_pattern = json_patten(&contents);
+    let json_pattern = json_pattern(&contents);
     let sls_pattern = sls_pattern(&contents);
 
     println!("{json_pattern}\n");
@@ -62,12 +62,14 @@ fn sls_pattern(contents: &String) -> String {
     sls_format
 }
 
-fn json_patten(contents: &String) -> String {
+fn json_pattern(contents: &String) -> String {
     let lines = contents.lines();
 
     let mut json_format = String::from("{\n");
 
-    for line in lines {
+    let mut iterator = lines.enumerate().peekable();
+
+    while let Some((_, line)) = iterator.next() {
         if line == "" {
             continue;
         }
@@ -76,9 +78,17 @@ fn json_patten(contents: &String) -> String {
         let key = key_value[0];
         let value = key_value[1];
 
-        json_format.push_str(format!("   \"{key}\": \"{value}\"\n").as_str());
+        json_format.push_str(format!("   \"{key}\": \"{value}\"").as_str());
+
+        if iterator.peek().is_some() {
+            json_format.push_str(",\n");
+        }
+
+        if iterator.peek().is_none() {
+            break;
+        }
     }
 
-    json_format.push_str("}");
+    json_format.push_str("\n}");
     json_format
 }
